@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>AEROS SYSTEMS</title>
+
+<style>
+body {
+  font-family: Arial;
+  margin: 20px;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.wrap {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+}
+
+.panel {
+  background: #111827;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 15px;
+}
+
+button {
+  padding: 10px;
+  background: #1f2937;
+  color: white;
+}
+
+#map {
+  background: #0b1220;
+  width: 900px;
+  height: 600px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>NEXUS CONTROL PANEL</h2>
+
+<div class="wrap">
+
+<div class="panel">
+<button onclick="stepOnce()">EXECUTE</button>
+
+<div>Done: <span id="done">0</span></div>
+<div>Active: <span id="active">0</span></div>
+<div>Pending: <span id="pending">0</span></div>
+</div>
+
+<div class="panel">
+<canvas id="map" width="900" height="600"></canvas>
+</div>
+
+</div>
+
+<script>
+
+let sim = { nodes:{}, tasks:{}, cycle_state:{} };
+
+const map = document.getElementById("map");
+const ctx = map.getContext("2d");
+
+function world(x,y){
+  return [x/100*900, 600-(y/100*600)];
+}
+
+function draw(){
+
+  ctx.fillStyle="#0b1220";
+  ctx.fillRect(0,0,900,600);
+
+  for(let t of Object.values(sim.tasks)){
+    let [x,y]=world(t.location[0],t.location[1]);
+
+    if(t.status==="PENDING"){
+      ctx.strokeStyle="white";
+      ctx.strokeRect(x-5,y-5,10,10);
+    }
+    else if(t.status==="ACTIVE"){
+      ctx.fillStyle="orange";
+      ctx.beginPath();
+      ctx.arc(x,y,6,0,6.28);
+      ctx.fill();
+    }
+    else{
+      ctx.fillStyle="gray";
+      ctx.fillRect(x-4,y-4,8,8);
+    }
+  }
+
+  for(let [id,n] of Object.entries(sim.nodes)){
+    let [x,y]=world(n.position[0],n.position[1]);
+
+    ctx.fillStyle="green";
+    ctx.beginPath();
+    ctx.arc(x,y,8,0,6.28);
+    ctx.fill();
+
+    ctx.fillStyle="white";
+    ctx.fillText(id,x+8,y-8);
+  }
+
+  document.getElementById("done").innerText = sim.cycle_state.done || 0;
+  document.getElementById("active").innerText = sim.cycle_state.active || 0;
+  document.getElementById("pending").innerText = sim.cycle_state.pending || 0;
+}
+
+async function stepOnce(){
+  let res = await fetch("/state");
+  sim = await res.json();
+  draw();
+}
+
+map.onclick = async (e)=>{
+  let rect=map.getBoundingClientRect();
+
+  let x=(e.clientX-rect.left)/900*100;
+  let y=(600-(e.clientY-rect.top))/600*100;
+
+  await fetch("/add_event",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({x,y,type:"suppression"})
+  });
+
+  await stepOnce();
+};
+
+stepOnce();
+
+</script>
+
+</body>
+</html>
